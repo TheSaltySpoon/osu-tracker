@@ -103,9 +103,99 @@ async function getOsuUser() {
         }
         return null
     }
-}     
+}
+
+async function getOsuUserActivity() {
+    const settings = store.get("settings")
+    if (!settings) return null;
+    const { user_id } = settings
+    const access_token = await getAccessToken()
+    if (!access_token) return null;
+    const api = axios.create({
+        baseURL: 'https://osu.ppy.sh/api/v2',
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${access_token}`,
+            "x-api-version": 20220707
+        }
+    })
+
+    axiosRetry(api, {
+        retries: 5, 
+        retryDelay: (retryCount) => {
+            logger.warn(`api request failed, retrying attempt ${retryCount}`)
+            return retryCount * 2000 
+        }
+    })
+    
+    try {
+        const response = await api.get(`https://osu.ppy.sh/api/v2/users/${user_id}/recent_activity`, {
+            params: {
+                legacy_only: 0,
+                limit: 100
+            }
+        })
+        const activities = response.data
+        return activities
+    } catch (err) {
+        logger.error(err)
+        if (err.response.status === 401) {
+            store.set("access_token", null)
+            await getAccessToken()
+            const retried_activities = await getOsuUserActivity()
+            return retried_activities
+        }
+        return null
+    }
+}   
+
+
+async function trackLeaderboardSpots() {
+    
+    const settings = store.get("settings")
+    if (!settings) return null;
+
+    let storedSpots = store.get("leaderboard_spots") || {}
+    let currentCount = store.get("leaderboard_spots_count") || 0
+    let runCount = store.get("runCount") || 0
+    try {
+        const activities = await getOsuUserActivity()
+        if (!activities) return null;
+
+        activities.forEach(activity => {
+            if (activity.type === 'rank') {
+                const beatmapTitle = activity.beatmap.title
+                const rank = activity.rank
+                
+                if (!(beatmapTitle in storedSpots)) {
+                    storedSpots[beatmapTitle] = rank
+                    currentCount++
+                }
+                else if(rank < storedSpots[beatmapTitle]) {
+                    storedSpots[beatmapTitle] = rank
+                }
+            }
+        })
+
+        store.set("leaderboard_spots_count", 0)
+        if (runCount > 2){
+            store.set("leaderboard_spots_count", currentCount)
+        }
+        runCount++
+        store.set("runCount", runCount)
+        store.set("leaderboard_spots", storedSpots)
+
+        return currentCount
+    } catch (err) {
+        logger.error(err)
+        return null
+    }
+}
+
 
 module.exports = {
     getOsuUser,
-    getScoreRank
+    getScoreRank,
+    trackLeaderboardSpots
 }
