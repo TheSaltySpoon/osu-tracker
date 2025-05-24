@@ -149,9 +149,6 @@ ipcMain.handle("getStats", async () => {
     const osuUser = await getOsuUser()
     const scoreRank = await getScoreRank()
     const leaderboardSpots = await trackLeaderboardSpots()
-
-    // console.log("leaderboardSpots:", leaderboardSpots);
-
     if (!osuUser || !scoreRank|| leaderboardSpots == null) return "Couldn't reach osu! api. (Invalid Client Credentials or User ID?)"
     const compactUser = new CompactUser(osuUser, scoreRank, leaderboardSpots)
     let initialUser = store.get("initial_user")
