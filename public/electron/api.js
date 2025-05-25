@@ -1,7 +1,8 @@
 const axios = require('axios').default
 const logger = require('electron-log');
 const Store = require('electron-store')
-const axiosRetry = require('axios-retry')
+const axiosRetry = require('axios-retry');
+const { chownSync } = require('original-fs');
 
 axiosRetry(axios, {
     retries: 5, // number of retries
@@ -105,6 +106,40 @@ async function getOsuUser() {
     }
 }
 
+async function getTotalLBCount(rankMax) {
+    const settings = store.get("settings")
+    if (!settings) return null;
+
+    const params = new URLSearchParams();
+    const username = store.get("username")
+    
+    params.append('u1', username);
+    params.append('gamemode', 0);
+    params.append('rankMin', 1);
+    params.append('rankMax', rankMax);
+
+    try {
+        const response = await axios.post('https://osustats.ppy.sh/api/getScores', params, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        const result = response.data;
+
+        if (Array.isArray(result) && result.length >= 2) {
+            console.log(result)
+            return result[1]; 
+        } else {
+            return 0;
+        }
+    } catch (error) {
+        console.error('Error fetching scores:', error);
+        return 0;
+    }
+}
+
+
 async function getOsuUserActivity() {
     const settings = store.get("settings")
     if (!settings) return null;
@@ -152,12 +187,17 @@ async function getOsuUserActivity() {
 
 
 async function trackLeaderboardSpots() {
-    
+
+    // return list of leaderboard spots (50, 8) #1s are tracked on profile
     const settings = store.get("settings")
     if (!settings) return null;
 
-    let storedSpots = store.get("leaderboard_spots") || {}
-    let currentCount = store.get("leaderboard_spots_count") || 0
+    let sessionTop50sScores = store.get("top50s_spots") || {}
+    let sessionTop50sCount = store.get("top50s_count") || 0
+
+    let sessionTop8sScores = store.get("top8s_spots") || {}
+    let sessionTop8sCount = store.get("top8s_count") || 0
+
     let runCount = store.get("runCount") || 0
     try {
         const activities = await getOsuUserActivity()
@@ -168,25 +208,51 @@ async function trackLeaderboardSpots() {
                 const beatmapTitle = activity.beatmap.title
                 const rank = activity.rank
                 
-                if (!(beatmapTitle in storedSpots)) {
-                    storedSpots[beatmapTitle] = rank
-                    currentCount++
+                if (!(beatmapTitle in sessionTop50sScores) && rank <= 50) {
+                    sessionTop50sScores[beatmapTitle] = rank
+                    sessionTop50sCount++
+
+                    if (rank <= 8) {
+                        sessionTop8sScores[beatmapTitle] = rank
+                        sessionTop8sCount++
+                    }
+
                 }
-                else if(rank < storedSpots[beatmapTitle]) {
-                    storedSpots[beatmapTitle] = rank
+                else if(rank < sessionTop50sScores[beatmapTitle]) {
+                    sessionTop50sScores[beatmapTitle] = rank
+
+                    if (!(beatmapTitle in sessionTop8sScores) && rank <= 8) {
+                        sessionTop50sScores[beatmapTitle] = rank
+                        sessionTop8sCount++
+                    }
                 }
             }
         })
 
-        store.set("leaderboard_spots_count", 0)
+        // make sure that the leaderboardspots at the start are 0
+        // instead of like 80
         if (runCount > 2){
-            store.set("leaderboard_spots_count", currentCount)
+            store.set("top50s_count", sessionTop50sCount)
+            store.set("top8s_count", sessionTop8sCount)
+
+
+        } else {
+            store.set("top50s_count", 0)
+            store.set("top8s_count", 0)
+                
+            store.set("Total_top50s_count", await getTotalLBCount(50))
+            store.set("Total_top8s_count", await getTotalLBCount(8))
         }
+
         runCount++
         store.set("runCount", runCount)
-        store.set("leaderboard_spots", storedSpots)
+        store.set("top50s_spots", sessionTop50sScores)
+        store.set("top8s_spots", sessionTop8sScores)
 
-        return currentCount
+        let TotalTop50sCount = store.get("Total_top50s_count") || 0
+        let TotalTop8sCount = store.get("Total_top8s_count") || 0
+
+        return [sessionTop50sCount + TotalTop50sCount, sessionTop8sCount + TotalTop8sCount]
     } catch (err) {
         logger.error(err)
         return null
