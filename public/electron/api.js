@@ -107,9 +107,6 @@ async function getOsuUser() {
 }
 
 async function getTotalLBCount(rankMax) {
-    const settings = store.get("settings")
-    if (!settings) return null;
-
     const params = new URLSearchParams();
     const username = store.get("username")
     
@@ -128,7 +125,7 @@ async function getTotalLBCount(rankMax) {
         const result = response.data;
 
         if (Array.isArray(result) && result.length >= 2) {
-            console.log(result)
+            // console.log(result)
             return result[1]; 
         } else {
             return 0;
@@ -187,10 +184,7 @@ async function getOsuUserActivity() {
 
 
 async function trackLeaderboardSpots() {
-
     // return list of leaderboard spots (50, 8) #1s are tracked on profile
-    const settings = store.get("settings")
-    if (!settings) return null;
 
     let sessionTop50sScores = store.get("top50s_spots") || {}
     let sessionTop50sCount = store.get("top50s_count") || 0
@@ -234,6 +228,7 @@ async function trackLeaderboardSpots() {
         if (runCount > 2){
             store.set("top50s_count", sessionTop50sCount)
             store.set("top8s_count", sessionTop8sCount)
+            runCount = 3
 
 
         } else {
@@ -251,7 +246,7 @@ async function trackLeaderboardSpots() {
 
         let TotalTop50sCount = store.get("Total_top50s_count") || 0
         let TotalTop8sCount = store.get("Total_top8s_count") || 0
-
+        console.log(runCount)
         return [sessionTop50sCount + TotalTop50sCount, sessionTop8sCount + TotalTop8sCount]
     } catch (err) {
         logger.error(err)
