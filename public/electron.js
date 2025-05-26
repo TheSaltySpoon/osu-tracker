@@ -105,6 +105,7 @@ app.whenReady().then( () => {
     // store.delete("visible_stats")
     // store.delete("hidden_stats")
     // store.delete("output_files")
+    store.set("sessionStart", true)
     startWebSocket()
     startWebServer()
 });
