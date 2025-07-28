@@ -182,25 +182,8 @@ async function getOsuUserActivity() {
     }
 }   
 
-async function resetSessionData() {
-    store.set("top50s_count", 0)
-    store.set("top8s_count", 0)
-                
-    store.set("Total_top50s_count", await getTotalLBCount(50))
-    store.set("Total_top8s_count", await getTotalLBCount(8))
-
-    store.set("runCount", 0)
-    store.set("top50s_spots", {})
-    store.set("top8s_spots", {})
-    store.set("sessionStart", false)
-}
-
 async function trackLeaderboardSpots() {
     // return list of leaderboard spots (50, 8) #1s are tracked on profile
-
-    if (store.get("sessionStart")){
-        resetSessionData()
-    }
 
     let sessionTop50sScores = store.get("top50s_spots") || {}
     let sessionTop50sCount = store.get("top50s_count") || 0

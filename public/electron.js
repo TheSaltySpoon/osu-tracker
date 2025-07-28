@@ -102,9 +102,10 @@ app.whenReady().then( () => {
     // clear logs on startup
     logger.transports.file.getFile().clear();
     store.delete("initial_user")
-    // store.delete("visible_stats")
-    // store.delete("hidden_stats")
-    // store.delete("output_files")
+
+    // allows trackLeaderboardSpots to reset session data
+    store.set("runCount", 0)
+
     store.set("sessionStart", true)
     startWebSocket()
     startWebServer()
